@@ -1,26 +1,21 @@
-FROM python:3.9-slim
+FROM python:3.11-slim
 
-# Install system dependencies (ffmpeg is required for audio conversion)
+# Install system dependencies
 RUN apt-get update && \
-    apt-get install -y ffmpeg && \
-    apt-get clean && \
+    apt-get install -y ffmpeg ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements and install dependencies
+# Copy files
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY server.py .
+COPY service.py .
 
-# Default port environment variable
-ENV PORT=8080
-
-# Expose port 8080 (documentation only, actual binding depends on CMD)
+# Expose port required by Render/Railway
 EXPOSE 8080
 
-# Run the application with Gunicorn, binding to the PORT environment variable
-CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 120 server:app
+# Start server
+CMD ["gunicorn", "-b", "0.0.0.0:8080", "--timeout", "300", "service:app"]
