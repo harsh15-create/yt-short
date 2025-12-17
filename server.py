@@ -6,6 +6,11 @@ import glob
 
 app = Flask(__name__)
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 @app.route("/health", methods=["GET"])
 def health():
     return {"status": "ok"}
