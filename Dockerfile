@@ -12,10 +12,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY service.py .
+COPY server.py .
 
 # Expose port required by Render/Railway
 EXPOSE 8080
 
 # Start server
-CMD ["gunicorn", "-b", "0.0.0.0:8080", "--timeout", "300", "service:app"]
+CMD ["gunicorn", "-b", "0.0.0.0:8080", "--timeout", "300", "server:app"]
