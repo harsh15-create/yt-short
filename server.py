@@ -3,22 +3,26 @@ import subprocess
 import uuid
 import os
 import glob
+import threading
+import time
 
 app = Flask(__name__)
+
+MAX_CONCURRENT_JOBS = 2
+semaphore = threading.Semaphore(MAX_CONCURRENT_JOBS)
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-
-@app.route("/health", methods=["GET"])
-def health():
-    return {"status": "ok"}
-
 @app.route("/audio", methods=["GET"])
 def get_audio():
+    if not semaphore.acquire(blocking=False):
+        abort(429, "Too many concurrent jobs")
+
     video_id = request.args.get("videoId")
     if not video_id:
+        semaphore.release()
         abort(400, "Missing videoId")
 
     tmp_id = str(uuid.uuid4())
@@ -27,7 +31,7 @@ def get_audio():
 
     cmd = [
         "yt-dlp",
-        "-f", "bestaudio",
+        "-f", "bestaudio/best",
         "--extract-audio",
         "--audio-format", "mp3",
         "--no-playlist",
@@ -36,25 +40,18 @@ def get_audio():
     ]
 
     try:
-        result = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=240
-        )
-    except Exception as e:
-        print("SUBPROCESS ERROR:", e)
-        abort(500, "yt-dlp execution failed")
-
-    if result.returncode != 0:
-        print("YT-DLP STDERR:", result.stderr)
+        subprocess.check_call(cmd, timeout=300)
+    except subprocess.TimeoutExpired:
+        semaphore.release()
+        abort(504, "Download timeout")
+    except subprocess.CalledProcessError:
+        semaphore.release()
         abort(500, "yt-dlp failed")
 
     files = glob.glob(f"/tmp/{tmp_id}*.mp3")
     if not files:
-        print("NO MP3 FILE CREATED")
-        abort(500, "File processing failed")
+        semaphore.release()
+        abort(500, "MP3 not generated")
 
     audio_path = files[0]
 
@@ -64,6 +61,7 @@ def get_audio():
             os.remove(audio_path)
         except Exception:
             pass
+        semaphore.release()
         return response
 
     return send_file(
@@ -72,6 +70,3 @@ def get_audio():
         as_attachment=True,
         download_name=f"{video_id}.mp3"
     )
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
