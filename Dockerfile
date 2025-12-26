@@ -18,4 +18,4 @@ COPY server.py .
 EXPOSE 8080
 
 # Start server
-CMD ["gunicorn", "-b", "0.0.0.0:8080", "--timeout", "300", "server:app"]
+CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:8080", "--timeout", "300", "server:app"]
